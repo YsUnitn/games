@@ -1,6 +1,7 @@
 import { h, mount, header, toast, pickFiles, uid, confirmDialog, downloadFile, modal } from '../lib/ui.js';
 import { db } from '../lib/db.js';
-import { squareThumb, emojiAvatar, cleanName } from '../lib/image.js';
+import { fitImage, emojiAvatar, cleanName } from '../lib/image.js';
+import { cropImage } from '../lib/cropper.js';
 import { importJSONFile } from './settings.js';
 
 export function boardPreview(b) {
@@ -67,10 +68,18 @@ export async function boardEditView(root, id) {
       const img = h('img', { src: c.img, alt: c.name });
       const inp = h('input', { class: 'char-name', value: c.name, placeholder: 'Nome', oninput: () => { c.name = inp.value; save(); } });
       return h('div', { class: 'edit-card' },
-        h('button', { class: 'img-btn', title: 'Cambia foto', onclick: async () => {
-          const [f] = await pickFiles({ multiple: false });
-          if (!f) return;
-          c.img = await squareThumb(f); img.src = c.img; save();
+        h('button', { class: 'img-btn', title: 'Ritaglia o cambia foto', onclick: async () => {
+          let src = c.src || c.img;
+          for (;;) {
+            const r = await cropImage(src, { name: c.name, title: 'Modifica personaggio', allowReplace: true });
+            if (!r) return;
+            if (r.name) { c.name = r.name; inp.value = r.name; }
+            if (r.action === 'ok') { c.img = r.img; c.src = src; img.src = c.img; await save(); return; }
+            // 'replace': scegli un'altra foto e ritagliala
+            const [f] = await pickFiles({ multiple: false });
+            if (!f) return;
+            try { src = await fitImage(f, 1200, 0.85); } catch { toast('Impossibile leggere la foto'); return; }
+          }
         } }, img),
         inp,
         h('button', { class: 'del', title: 'Elimina', onclick: async () => {
@@ -82,15 +91,26 @@ export async function boardEditView(root, id) {
 
   const addPhotos = async () => {
     const files = await pickFiles();
-    let i = 0;
+    let i = 0, added = 0;
     for (const f of files) {
-      progress.textContent = `Elaboro foto ${++i}/${files.length}…`;
-      try { board.chars.push({ id: uid(6), name: cleanName(f.name) || `#${board.chars.length + 1}`, img: await squareThumb(f) }); }
-      catch { toast('Impossibile leggere ' + f.name); }
+      i++;
+      progress.textContent = `Carico foto ${i}/${files.length}…`;
+      let src;
+      try { src = await fitImage(f, 1200, 0.85); } catch { toast('Impossibile leggere ' + f.name); continue; }
+      progress.textContent = '';
+      const guess = /^(img|dsc|pxl|photo|image|foto|screenshot|whatsapp)[\s_-]?/i.test(f.name) ? '' : cleanName(f.name);
+      const r = await cropImage(src, {
+        name: guess,
+        title: files.length > 1 ? `Foto ${i} di ${files.length}` : 'Ritaglia la faccia',
+        skipLabel: files.length > 1 ? 'Salta' : 'Annulla',
+      });
+      if (!r) continue;
+      board.chars.push({ id: uid(6), name: r.name || `Personaggio ${board.chars.length + 1}`, img: r.img, src });
+      added++;
+      await save(); draw();
     }
     progress.textContent = '';
-    await save(); draw();
-    if (files.length) toast('Ricorda di dare un nome a ogni personaggio ✍️');
+    if (added) toast(added === 1 ? 'Personaggio aggiunto ✅' : `${added} personaggi aggiunti ✅`);
   };
 
   const more = () => {
@@ -105,6 +125,7 @@ export async function boardEditView(root, id) {
   mount(root, header('Modifica tabella', { back: '#/boards', right: h('button', { class: 'icon-btn', onclick: more }, '⋯') }),
     nameIn,
     h('div', { class: 'row between' }, count, progress),
+    h('p', { class: 'muted small' }, '✂️ Tocca una foto per ritagliarla di nuovo, cambiarla o rinominarla.'),
     grid,
     h('div', { class: 'sticky-bottom row' },
       h('button', { class: 'btn primary grow', onclick: addPhotos }, '📷 Aggiungi foto'),

@@ -22,7 +22,7 @@ const routes = [
   [/^quiz$/, quizSetup],
   [/^memory$/, memoryView],
   [/^play\/(\w+)\/([\w-]+)$/, playView],
-  [/^join\/([\w-]+)$/, joinView],
+  [/^join\/([\w.-]+)$/, joinView],
   [/^settings$/, settingsView],
 ];
 

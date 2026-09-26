@@ -13,7 +13,7 @@ export function statusPill(room) {
   const el = h('button', { class: 'pill', type: 'button' });
   const upd = () => {
     const [i, t] = LABELS[room.status] || ['⏳', room.status];
-    el.textContent = `${i} ${t}`;
+    el.textContent = `${i} ${t}` + (room.status === 'connected' && room.via === 'relay' ? ' · riserva' : '');
     el.dataset.s = room.status;
   };
   el.onclick = () => {
@@ -48,7 +48,7 @@ export function invitePanel(room, { compact = false } = {}) {
   QRCode.toDataURL(link, { margin: 1, width: 360 }).then((u) => { img.src = u; }).catch(() => img.remove());
   return h('div', { class: 'card invite' },
     h('h3', {}, '💌 Invita il tuo partner'),
-    h('p', { class: 'muted small' }, 'Manda questo link: la partita si apre direttamente sul suo telefono.'),
+    h('p', { class: 'muted small' }, 'Manda questo link: la partita si apre direttamente sul suo telefono. Dopo averlo mandato torna subito qui e tieni l’app aperta finché non entra.'),
     h('div', { class: 'linkbox' }, link),
     h('div', { class: 'row' },
       h('button', { class: 'btn primary grow', onclick: () => shareLink(link) }, '📤 Condividi'),

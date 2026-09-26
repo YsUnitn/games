@@ -1,5 +1,6 @@
 import { h, mount, header, toast, promptDialog } from '../lib/ui.js';
 import { hostRoom, joinRoom, createHostSession, createGuestSession } from '../lib/net.js';
+import { newKey } from '../lib/key.js';
 import { getSettings, setSettings } from '../lib/db.js';
 import { statusPill, invite } from '../lib/lobby.js';
 import { guessWho } from './guesswho.js';
@@ -12,7 +13,8 @@ export const GAMES = { guesswho: guessWho, geo: geoGame, quiz: quizGame };
 const key = (id) => 'gc-room-' + id;
 export function saveRoom(id, game, state) {
   try {
-    localStorage.setItem(key(id), JSON.stringify({ game, state, t: Date.now() }));
+    const prev = loadRoom(id);
+    localStorage.setItem(key(id), JSON.stringify({ game, state, key: prev?.key || newKey(), t: Date.now() }));
     const idx = listRooms().filter((r) => r.id !== id);
     idx.unshift({ id, game, t: Date.now() });
     localStorage.setItem('gc-rooms', JSON.stringify(idx.slice(0, 10)));
@@ -57,14 +59,15 @@ export function gameShell(root, session, title) {
 
 export async function playView(root, gameId, roomId) {
   const game = GAMES[gameId];
-  const saved = loadRoom(roomId);
+  let saved = loadRoom(roomId);
+  if (saved && !saved.key) { saveRoom(roomId, saved.game, saved.state); saved = loadRoom(roomId); }
   if (!game || !saved) {
     mount(root, header('Partita'), h('div', { class: 'card' }, h('p', {}, 'Partita non trovata su questo telefono.'), h('a', { class: 'btn', href: '#/' }, 'Torna alla home')));
     return;
   }
   mount(root, header(game.title), h('div', { class: 'center-msg' }, h('div', { class: 'spinner' }), h('p', {}, 'Preparo la stanza…')));
   let room;
-  try { room = await hostRoom(roomId); }
+  try { room = await hostRoom(roomId, saved.key); }
   catch (e) {
     mount(root, header(game.title), h('div', { class: 'card' },
       h('h3', {}, 'Impossibile creare la stanza'),
@@ -92,7 +95,7 @@ export async function joinView(root, hostId) {
     h('p', { class: 'muted small' }, 'Il tuo partner deve tenere la partita aperta sul suo telefono.')));
   const room = await joinRoom(hostId);
   room.on('status', (s) => {
-    if (s === 'failed') { status.textContent = 'Non trovo la partita. Il tuo partner ha l’app aperta? Riprovo da solo…'; retry.style.display = ''; }
+    if (s === 'failed') { status.textContent = 'Non trovo la partita. Chi l’ha creata deve tenere l’app aperta in primo piano (non chiuderla per mandarti il link). Continuo a riprovare…'; retry.style.display = ''; }
     if (s === 'connecting') status.textContent = 'Mi collego…';
   });
   const session = createGuestSession(room, { name });

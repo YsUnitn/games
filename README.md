@@ -11,7 +11,8 @@ Webapp privata (niente account, niente server con le vostre foto) per giocare in
 
 ## Privacy
 - Foto e tabelle sono salvate **solo nel browser** del telefono (IndexedDB). Da *Impostazioni* puoi esportare/importare un backup.
-- Durante una partita online le foto passano **direttamente da telefono a telefono** (WebRTC, cifrato). Il server pubblico di PeerJS serve solo a far "trovare" i due telefoni; se la connessione diretta non riesce (alcune reti mobili) i dati cifrati passano da un relay TURN, che non può leggerli.
+- Durante una partita online le foto passano **direttamente da telefono a telefono** (WebRTC, cifrato). Il server pubblico di PeerJS serve solo a far "trovare" i due telefoni.
+- Se la connessione diretta non riesce (capita spesso su 4G/5G) entra in gioco un **canale di riserva**: i messaggi passano da server MQTT pubblici (EMQX, HiveMQ) ma sono **cifrati end-to-end con AES-GCM** con una chiave generata per ogni partita che sta solo nel link di invito (dopo il `.`, nella parte `#` che i browser non inviano ai server). I server vedono solo byte illeggibili. In alto compare "Connessi · riserva".
 - Le mappe sono di OpenStreetMap / Esri: si scaricano solo i riquadri della mappa, mai le foto.
 
 ## Pubblicazione (una volta sola, anche da telefono)
@@ -27,6 +28,7 @@ npm install
 npm run dev      # http://localhost:5173
 npm run build    # output in dist/
 ```
+Per forzare il canale di riserva con un broker locale: `?nop2p&broker=ws://127.0.0.1:8888`.
 Per provare le partite online senza rete, apri due schede con `?local` (es. `http://localhost:5173/?local#/`): comunicano tramite BroadcastChannel.
 
 Struttura: `src/lib` (UI, archivio locale, immagini, rete P2P, mappe), `src/views` (una vista per gioco). Ogni gioco online è un *reducer* che gira sul telefono di chi crea la partita; l'altro invia azioni e riceve lo stato.

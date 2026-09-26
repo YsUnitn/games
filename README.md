@@ -4,7 +4,7 @@ Webapp privata (niente account, niente server con le vostre foto) per giocare in
 
 | Gioco | Come si gioca |
 |---|---|
-| 🕵️ **Indovina Chi** | Crei le tue tabelle con foto e nomi, le riusi quando vuoi. Crei la partita → link da mandare al partner → ognuno sceglie il personaggio segreto → domande sì/no a turno, carte da abbassare, rivincita con punteggio. |
+| 🕵️ **Indovina Chi** | Crei le tue tabelle con foto e nomi, le riusi quando vuoi. Crei la partita → link da mandare al partner → ognuno sceglie il personaggio segreto. Due modalità: **Insieme** (domande a voce, l’app gestisce carte, turni e “Indovina”) e **A distanza** (domande sì/no e chat nell’app). |
 | 🌍 **GeoGuesser** | Crei pacchetti di foto con la loro posizione (letta dal GPS della foto, oppure cercata/toccata sulla mappa). Il partner indovina dove sono state scattate: online col link, oppure sullo stesso telefono. Punteggio stile GeoGuessr (max 5000 a foto) con severità regolabile (mondo / Europa / paese / città). |
 | 💞 **Quanto mi conosci?** | Online: a turno uno risponde su di sé in segreto e l'altro prova a indovinare. 48 domande già pronte + le vostre. |
 | 🃏 **Memory** | Con le foto delle tue tabelle, sullo stesso telefono, 1 o 2 giocatori. |

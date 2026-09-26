@@ -19,10 +19,24 @@ export async function guessWhoSetup(root) {
   }, boardPreview(b), h('div', { class: 'grow' }, h('strong', {}, b.name), h('div', { class: 'muted small' }, `${b.chars.length} personaggi`)), h('span', { class: 'radio' }))));
   drawList();
 
+  let mode = localStorage.getItem('gw-mode') || 'voice';
+  const modes = h('div', { class: 'mode-pick' });
+  const MODES = {
+    voice: ['🗣️', 'Insieme', 'Siete nella stessa stanza e le domande le fate a voce. L’app gestisce solo carte, turni e “Indovina”.'],
+    chat: ['🌐', 'A distanza', 'Siete lontani: domande e risposte Sì/No si scrivono nell’app, con chat.'],
+  };
+  const drawModes = () => modes.replaceChildren(...Object.entries(MODES).map(([k, [e, t, d]]) => h('button', {
+    class: 'mode-card' + (mode === k ? ' selected' : ''),
+    onclick: () => { mode = k; try { localStorage.setItem('gw-mode', k); } catch {} drawModes(); },
+  }, h('span', { class: 'mode-emoji' }, e), h('strong', {}, t), h('span', { class: 'muted small' }, d))));
+  drawModes();
+
   mount(root, header('Indovina Chi'),
     h('div', { class: 'card' },
-      h('p', {}, 'Scegli la tabella, crea la partita e manda il link al tuo partner. Ognuno sceglie un personaggio segreto; a turno fate domande sì/no per scoprire quello dell’altro.'),
+      h('p', {}, 'Ognuno usa il suo telefono: crea la partita e manda il link al tuo partner. Ognuno sceglie un personaggio segreto e a turno fate domande sì/no per scoprire quello dell’altro.'),
     ),
+    modes,
+    boards.length ? h('h3', {}, 'Tabella') : null,
     boards.length ? list : h('div', { class: 'card center' },
       h('p', {}, 'Ti serve una tabella con almeno 4 personaggi.'),
       h('a', { class: 'btn primary', href: '#/boards' }, '🗂️ Crea una tabella'),
@@ -34,15 +48,16 @@ export async function guessWhoSetup(root) {
         const name = await ensureName(); if (!name) return;
         const b = await db.get('boards', chosen);
         const id = 'gdc-' + uid(8);
-        saveRoom(id, 'guesswho', initialState(b, name));
+        saveRoom(id, 'guesswho', initialState(b, name, mode));
         location.hash = `#/play/guesswho/${id}`;
       } }, '🎮 Crea partita'),
     ) : null,
   );
 }
 
-function initialState(board, hostName) {
+function initialState(board, hostName, mode = 'chat') {
   return {
+    mode,
     phase: 'lobby', boardId: board.id, boardName: board.name,
     chars: board.chars.map((c) => ({ id: c.id, name: c.name })),
     names: { host: hostName, guest: null },
@@ -112,7 +127,7 @@ function render(session, root) {
   const body = gameShell(root, session, 'Indovina Chi');
   const unbind = bindAssets(session, root);
   let mode = 'flip'; // oppure 'guess'
-  let lastPhase = null, celebrated = null;
+  let lastPhase = null, celebrated = null, lastTurn = null;
   let actEl = null, actKey = '';
   const cards = {};
 
@@ -172,6 +187,20 @@ function render(session, root) {
 
   function actions(s) {
     const myTurn = s.turn === me;
+    if (s.mode === 'voice') {
+      if (!myTurn) return h('div', { class: 'action-bar' }, h('p', { class: 'center' }, `🗣️ Tocca a ${s.names[op]}: rispondi a voce alla sua domanda.`));
+      if (mode === 'guess') {
+        return h('div', { class: 'action-bar highlight' },
+          h('p', { class: 'center' }, '🎯 Tocca il personaggio che pensi sia il suo'),
+          h('button', { class: 'btn', onclick: () => { mode = 'flip'; draw(); } }, 'Annulla'));
+      }
+      return h('div', { class: 'action-bar' },
+        h('p', { class: 'center' }, '🗣️ Fai la tua domanda a voce, abbassa le carte scartate e passa il turno.'),
+        h('div', { class: 'row' },
+          h('button', { class: 'btn grow', onclick: () => { mode = 'guess'; draw(); } }, '🎯 Indovina'),
+          h('button', { class: 'btn primary grow', onclick: () => session.dispatch({ type: 'pass' }) }, 'Passa il turno ➡️'),
+        ));
+    }
     if (s.pending && s.pending.by !== me) {
       vibrate([40, 60, 40]);
       return h('div', { class: 'action-bar highlight' },
@@ -243,6 +272,7 @@ function render(session, root) {
     }
 
     if (s.phase === 'play') {
+      if (s.turn !== lastTurn) { if (lastTurn && s.turn === me) vibrate([30, 50, 30]); lastTurn = s.turn; }
       const left = s.chars.length - s.down[op].length;
       mount(body, score,
         h('div', { class: 'row between info-row' },
@@ -250,7 +280,7 @@ function render(session, root) {
           h('div', { class: 'muted small' }, `${s.names[op]}: ${left} in piedi`)),
         h('div', { class: 'turn-banner ' + (s.turn === me ? 'mine' : '') }, s.turn === me ? '👉 È il tuo turno' : `⏳ Turno di ${s.names[op]}`),
         grid(s),
-        logView(s),
+        s.mode === 'voice' ? null : logView(s),
         cachedActions(s),
       );
       return;
@@ -272,7 +302,7 @@ function render(session, root) {
           h('button', { class: 'btn primary', onclick: () => session.dispatch({ type: 'rematch' }) }, '🔁 Rivincita'),
           session.isHost ? null : h('button', { class: 'btn', onclick: () => saveBoardLocally(session) }, '💾 Salva questa tabella'),
         ),
-        logView(s, 30),
+        s.mode === 'voice' ? null : logView(s, 30),
       );
     }
   }
